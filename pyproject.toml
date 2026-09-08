@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "full-history-agent"
+version = "1.0.0"
+description = "Autonomous MAGMA HTTP agent"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "BSD-2-Clause"}
+dependencies = ["magma_core[interface]>=2.0.0,<3.0.0", "torch", "transformers", "accelerate", "bitsandbytes", "fastapi", "uvicorn", "pydantic>=2.4,<3", "openai-harmony", "protobuf"]
+
+[project.scripts]
+full-history-agent = "full_history_agent.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

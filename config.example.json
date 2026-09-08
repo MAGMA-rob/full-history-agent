@@ -1,0 +1,7 @@
+{
+  "model": {
+    "path": "/models/qwen",
+    "quantization": "4bit"
+  },
+  "prompt_log_dir": "logs/prompts"
+}

@@ -1,0 +1,65 @@
+from typing import Any, Dict, List
+import json
+
+from .messages import BatchedMessageCommander
+
+
+def _stringify_content(content: Any) -> str:
+    if isinstance(content, (dict, list)):
+        return json.dumps(content, ensure_ascii=True)
+    if content is None:
+        return ""
+    return str(content)
+
+
+def get_history_content(message: Dict[str, Any]) -> str:
+    return _stringify_content(message.get("content", message.get("sentence", "")))
+
+
+def format_history_content(message: Dict[str, Any], role: str) -> str:
+    content = get_history_content(message)
+    if role != "assistant" or "<tool_call>" in content:
+        return content
+
+    try:
+        output = json.loads(content)
+    except json.JSONDecodeError:
+        return content
+    if not isinstance(output, dict) or not ({"say", "action"} & output.keys()):
+        return content
+
+    say = _stringify_content(output.get("say", "")).strip()
+    action = output.get("action", {})
+    if not action:
+        return say
+    return (
+        say
+        + "<tool_call>"
+        + json.dumps(action, ensure_ascii=False)
+        + "</tool_call>"
+    )
+
+
+def get_instruction_roles(message: BatchedMessageCommander) -> List[str]:
+    roles = getattr(message, "instruction_role", [])
+    if not roles:
+        return ["USER"] * len(message.instruction)
+    if len(roles) != len(message.instruction):
+        raise ValueError(
+            "instruction_role must have the same length as instruction in BatchedMessageCommander"
+        )
+    return roles
+
+
+def map_chat_role(
+    author: str | None,
+    system_role: str = "tool",
+    model_role: str = "assistant",
+) -> str:
+    if author in ("MODEL", "model", "assistant"):
+        return model_role
+    if author in ("SYSTEM", "system", "status"):
+        return system_role
+    if author in (None, "", "USER", "user"):
+        return "user"
+    return str(author)
