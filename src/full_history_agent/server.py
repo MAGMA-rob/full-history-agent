@@ -47,7 +47,7 @@ def create_app(settings: Settings):
                          specialized_coaching=["failure", "suboptimal", "format"],
                          coaching_session_version="1",
                          coaching_resume=True,
-                         capabilities={"inference": True, "coaching": True, "export": False})
+                         capabilities={"inference": True, "coaching": True})
 
     @app.post("/v1/responses", response_model=AgentResponse)
     async def responses(request: AgentRequest):
