@@ -7,37 +7,31 @@ import json
 from pathlib import Path
 
 from magma_core.protocol.agent import AgentHealth, AgentInfo, AgentRequest, AgentResponse
-from magma_core.protocol.agent_coaching import SpecializedCoachingRequest, SpecializedCoachingResponse
 from . import __version__
 from .config import Settings
+from magma_core.workers.coaching_sessions import CoachingSessions, mount_coaching_routes
 
 
 def create_app(settings: Settings):
     from fastapi import FastAPI, HTTPException
+
+    sessions = CoachingSessions(supported=True)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="full-history-agent-inference")
         app.state.executor = executor
         app.state.runtime = None
-        app.state.coaching = None
-        coaching_pool = None
         loop = asyncio.get_running_loop()
         try:
             from .runtime.agent import Runtime
             app.state.runtime = await loop.run_in_executor(executor, Runtime, settings)
-            if settings.coaching_backends:
-                from magma_core.workers import LMWorkerPool
-                from .coaching.service import CoachingService
-                coaching_pool = await asyncio.to_thread(LMWorkerPool, settings.coaching_backends)
-                app.state.coaching = CoachingService(coaching_pool)
             yield
         finally:
             # An inference already running remains exclusive even after HTTP cancellation.
             await asyncio.to_thread(executor.shutdown, wait=True, cancel_futures=True)
             app.state.runtime = None
-            if coaching_pool is not None:
-                await asyncio.to_thread(coaching_pool.close)
+            await asyncio.to_thread(sessions.close_all)
 
     app = FastAPI(title="full-history-agent", version=__version__, lifespan=lifespan)
 
@@ -50,16 +44,10 @@ def create_app(settings: Settings):
     @app.get("/v1/info", response_model=AgentInfo)
     async def info():
         return AgentInfo(agent_id="full-history-agent", agent_version=__version__,
-                         specialized_coaching=["failure", "suboptimal", "format"] if settings.coaching_backends else [],
+                         specialized_coaching=["failure", "suboptimal", "format"],
+                         coaching_session_version="1",
                          coaching_resume=True,
-                         capabilities={"inference": True, "coaching": bool(settings.coaching_backends), "export": False})
-
-    @app.post("/v1/coaching", response_model=SpecializedCoachingResponse)
-    async def coaching(request: SpecializedCoachingRequest):
-        service = getattr(app.state, "coaching", None)
-        if service is None:
-            raise HTTPException(status_code=503, detail="Specialized coaching is not configured")
-        return await asyncio.to_thread(service.process, request)
+                         capabilities={"inference": True, "coaching": True, "export": False})
 
     @app.post("/v1/responses", response_model=AgentResponse)
     async def responses(request: AgentRequest):
@@ -74,6 +62,9 @@ def create_app(settings: Settings):
         response = AgentResponse(result)
         response.validate_request(request)
         return response
+
+    from .coaching.service import CoachingService
+    mount_coaching_routes(app, sessions, CoachingService)
 
     return app
 

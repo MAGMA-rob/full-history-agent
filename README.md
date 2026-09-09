@@ -90,8 +90,7 @@ output. TSR adds its state snapshots and views. Errors retain these records.
 ## Migration and validation limits
 
 This replaces the former multi-agent server. Gen/bench are intentionally not
-migrated and cannot use protocol v2 until adapted. No export/coaching endpoint is
-implemented. Validation for this extraction covers compilation, imports and
+migrated and cannot use protocol v2 until adapted. Specialized HTTP coaching and export are described below. Validation for this extraction covers compilation, imports and
 packaging only; model inference and GPU quantization require separate validation.
 
 ## Coaching HTTP
@@ -101,17 +100,24 @@ ou `{"kind":"replace_decision","decision":{"say":"...","tool_calls":[]}}`.
 Il reconstruit l'historique depuis l'entrée fournie sans nouvelle inférence.
 Les corrections invalides sont des erreurs de candidat.
 
-Pour activer `/v1/coaching`, ajouter dans le fichier JSON de configuration :
+`/v1/info` annonce `failure`, `suboptimal`, `format` et `coaching_session_version: "1"`.
+La configuration de coaching vient exclusivement de `magma_gen` : supprimer l'ancien
+champ `coaching_backends` du JSON de l'agent. Celui-ci conserve ses paramètres de modèle.
 
-```json
-{"model":{"path":"/models/checkpoint"},"coaching_backends":{"coach":{"type":"ollama","endpoint":"http://localhost:11434","default_model":"your-coaching-model","headers":{},"timeout":120,"max_retry":0}}}
-```
+Avant les corrections, `magma_gen` enregistre les backends effectifs et le fournisseur
+LLM ou humain via `PUT /v1/coaching/sessions/{run_id}`. Chaque requête à `/v1/coaching`
+porte ce `run_id`. Une session est immuable et ses workers sont libérés par
+`DELETE /v1/coaching/sessions/{run_id}`, après la fin des requêtes actives.
 
-Le pool spécialisé appartient au serveur HR et utilise les backends externes de core.
-Les types et paramètres de backend sont ceux de `BackendConfig`. Il est indépendant
-du worker unique d'inférence. Sans backends, le coaching spécialisé renvoie HTTP 503,
-mais la matérialisation des corrections reste disponible. Les propositions de coaching
-ne constituent pas des décisions exécutables avant leur passage par `/v1/responses`.
+Les réponses contiennent `logs: [{"coaching_type": "failure", "content": "..."}]`,
+y compris en cas d'abandon ou d'erreur. `magma_gen` écrit ces traces avec les diagnostics
+locaux dans `output/<folder>/_coaching_logs/000001_failure.md`. Aucun montage du dossier
+de sortie dans l'agent n'est nécessaire. Les propositions passent toujours par
+`/v1/responses` avant leur exécution.
+
+Les backends doivent être accessibles depuis l'agent : dans Docker, `localhost`
+désigne le conteneur. Les adresses ne sont pas réécrites automatiquement.
+Déployer ensemble les versions compatibles de `magma_core`, `magma_gen` et de l'agent.
 
 ## Dataset export service
 

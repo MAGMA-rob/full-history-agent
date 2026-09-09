@@ -1,7 +1,6 @@
 """Configuration only: importing this module never loads inference libraries."""
-from typing import Literal
-from magma_core.configs import BackendConfig
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ModelSettings(BaseModel):
@@ -27,5 +26,11 @@ class Settings(BaseModel):
     host: str = "0.0.0.0"
     port: int = Field(default=8888, ge=1, le=65535)
     prompt_log_dir: str | None = None
-    coaching_backends: dict[str, BackendConfig] = Field(default_factory=dict)
     model: ModelSettings
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_local_coaching_backends(cls, value: Any) -> Any:
+        if isinstance(value, dict) and "coaching_backends" in value:
+            raise ValueError("coaching_backends is now supplied by magma_gen through coaching sessions; remove it from the agent configuration")
+        return value
