@@ -1,19 +1,34 @@
 """Specialized HR correction. Uses external coaching backends only."""
 import json
+from copy import deepcopy
+from magma_core.workers.base import PayloadWorker
 from magma_core.protocol.agent import AgentDecision, ToolCall
-from magma_core.protocol.agent_coaching import CoachingProposal, SpecializedCoachingResponse
+from magma_core.protocol.agent_coaching import CoachingProposal, SpecializedCoachingRequest, SpecializedCoachingResponse
 from magma_core.protocol.payload.generic_coaching import FormatFixPayload
 from .protocol.payloads.failure_coaching import FailureFixPayload
 from .protocol.payloads.suboptimal_coaching import SuboptimalFixPayload
 
 
 class CoachingService:
-    def __init__(self, worker):
+    def __init__(self, worker: PayloadWorker) -> None:
         self.worker = worker
 
-    def process(self, request):
+    def process(self, request: SpecializedCoachingRequest) -> SpecializedCoachingResponse:
         target = next(step for step in request.trajectory if step.id == request.target_step_id)
-        trajectory = [step.execution for step in request.trajectory if step.execution]
+        trajectory = []
+        reached_target = False
+        for step in request.trajectory:
+            if step.execution:
+                evidence = deepcopy(step.execution)
+                if reached_target and request.kind == 'failure':
+                    evidence.pop('answer', None)
+                    evidence.pop('answer_data', None)
+                    evidence.pop('execution_results', None)
+                    trajectory.append(evidence)
+                    break
+                trajectory.append(evidence)
+            if step.id == target.id:
+                reached_target = True
         action = {} if target.output is None else {
             call.target_robot_name: {'name': call.name, 'arguments': call.arguments}
             for call in target.output.tool_calls

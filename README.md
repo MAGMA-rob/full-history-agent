@@ -93,3 +93,42 @@ This replaces the former multi-agent server. Gen/bench are intentionally not
 migrated and cannot use protocol v2 until adapted. No export/coaching endpoint is
 implemented. Validation for this extraction covers compilation, imports and
 packaging only; model inference and GPU quantization require separate validation.
+
+## Coaching HTTP
+
+Le runtime accepte `extra_keys.coaching` avec `{"kind":"replace_say","text":"..."}`
+ou `{"kind":"replace_decision","decision":{"say":"...","tool_calls":[]}}`.
+Il reconstruit l'historique depuis l'entrée fournie sans nouvelle inférence.
+Les corrections invalides sont des erreurs de candidat.
+
+Pour activer `/v1/coaching`, ajouter dans le fichier JSON de configuration :
+
+```json
+{"model":{"path":"/models/checkpoint"},"coaching_backends":{"coach":{"type":"ollama","endpoint":"http://localhost:11434","default_model":"your-coaching-model","headers":{},"timeout":120,"max_retry":0}}}
+```
+
+Le pool spécialisé appartient au serveur HR et utilise les backends externes de core.
+Les types et paramètres de backend sont ceux de `BackendConfig`. Il est indépendant
+du worker unique d'inférence. Sans backends, le coaching spécialisé renvoie HTTP 503,
+mais la matérialisation des corrections reste disponible. Les propositions de coaching
+ne constituent pas des décisions exécutables avant leur passage par `/v1/responses`.
+
+## Dataset export service
+
+Start the dedicated process without inference models:
+
+```bash
+full-history-agent-export --host 127.0.0.1 --port 8100
+magma-gen export output --export-url http://127.0.0.1:8100 --skip-pre-made -n 2
+```
+
+The service accepts producer-matched `/v1/export` batches and returns dataset rows.
+It loads no model, tokenizer or backend. Local seeded variants rename known robots
+consistently across prompts, input elements, legacy training columns and outputs;
+structured fields are not shuffled independently of their rendered prompt. No private
+options are currently accepted. Failed transformations return per-example errors.
+
+Training rows retain component-specific columns and additionally carry full_prompt,
+input_elements and output_raw for faithful inspection of the recorded exchange.
+Gen writes JSONL datasets and an export manifest; consumers of the previous JSON arrays
+must adapt their dataset loading. No trainer changes are included here.
