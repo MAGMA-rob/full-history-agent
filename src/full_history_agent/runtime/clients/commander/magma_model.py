@@ -78,17 +78,6 @@ class MagmaCommander(CausalModelClient):
             )
         return formatted_inputs
 
-    def count_prompt_tokens(self, message: BatchedMessageCommander) -> List[int]:
-        formatted_inputs = self._format_batch(message)
-        encoded = self.tokenizer(
-            formatted_inputs,
-            padding=False,
-        )
-        return [len(input_ids) for input_ids in encoded["input_ids"]]
-
-    def count_prompt_characters(self, message: BatchedMessageCommander) -> List[int]:
-        return [len(prompt) for prompt in self._format_batch(message)]
-
     def process_batched_entry(self, message : BatchedMessageCommander, inference_mode : bool) -> List[Dict]:
         formatted_inputs = self._format_batch(message)
 

@@ -10,12 +10,6 @@ class Renderer(DatasetRenderer):
     def render(self, channel: str, example: dict[str, Any]) -> dict[str, Any]:
         if channel not in self.filenames:
             raise ValueError(f'Unsupported dataset channel: {channel}')
-        if channel == 'summarizer':
-            return {
-                'previous_summary': example.get('previous_summary', ''),
-                'history': json.dumps(example.get('history', []), ensure_ascii=False),
-                'output': example['output'],
-            }
         row = {key: json.dumps(example.get(key, default), ensure_ascii=False)
                for key, default in (('tools', []), ('persistent_rules', []), ('memory', {}),
                                     ('attributes', {}), ('history', []))}
