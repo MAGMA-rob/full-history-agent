@@ -194,6 +194,7 @@ class HRAgentFormat(BaseAgentFormat):
                 "persistent_rules": list(
                     metadata.get("persistent_rules", [])
                 ),
+                "all_task_attributes": deepcopy(metadata.get("all_task_attributes", {})),
                 "stats": dict(stats),
             }
         }
