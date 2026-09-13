@@ -12,9 +12,17 @@ license = {text = "BSD-2-Clause"}
 dependencies = ["magma_core[interface]>=2.0.0,<3.0.0", "torch", "transformers", "accelerate", "bitsandbytes", "fastapi", "uvicorn", "pydantic>=2.4,<3", "openai-harmony", "protobuf"]
 
 [project.scripts]
-full-history-agent-export = "full_history_agent.export.server:main"
 full-history-agent = "full_history_agent.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+
+[project.entry-points."magma.export.gen"]
+full-history-agent = "full_history_agent.export.service:Exporter"
+
+[project.entry-points."magma.export.offpolicy"]
+full-history-agent = "full_history_agent.export.offpolicy.format:HRAgentFormat"
+
+[project.optional-dependencies]
+offpolicy = ["magma-offpolicy-gen>=0.1.0"]

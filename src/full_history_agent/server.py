@@ -47,7 +47,7 @@ def create_app(settings: Settings):
                          specialized_coaching=["failure", "suboptimal", "format"],
                          coaching_session_version="1",
                          coaching_resume=True,
-                         capabilities={"inference": True, "coaching": True, "export": False})
+                         capabilities={"inference": True, "coaching": True})
 
     @app.post("/v1/responses", response_model=AgentResponse)
     async def responses(request: AgentRequest):
@@ -76,39 +76,35 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--host")
     parser.add_argument("--port", type=int)
     parser.add_argument("--prompt-log-dir")
-    models = ['model']
-    for name in models:
-        parser.add_argument("--" + name, dest=name + "_path")
-        prefix = "" if name == "model" else name + "-"
-        parser.add_argument("--" + ("model-format" if name == "model" else prefix + "format"), dest=name + "_format", choices=["auto", "magma", "qwen", "gpt-oss"])
-        parser.add_argument("--" + prefix + "quantization", dest=name + "_quantization", choices=["auto", "4bit", "8bit", "none"])
-        parser.add_argument("--" + prefix + "dtype", dest=name + "_dtype", choices=["auto", "float16", "bfloat16", "float32"])
-        parser.add_argument("--" + prefix + "max-new-tokens", dest=name + "_max_new_tokens", type=int)
-        for option in ("device_map", "gpu_memory_limit", "offload_folder", "attn_implementation", "chat_template", "output_style"):
-            parser.add_argument("--" + prefix + option.replace("_", "-"), dest=name + "_" + option)
-        for option in ("use_cache", "enable_thinking", "allow_cpu_offload"):
-            parser.add_argument("--" + prefix + option.replace("_", "-"), dest=name + "_" + option,
-                                action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--model", dest="model_path")
+    parser.add_argument("--model-format", dest="model_format", choices=["auto", "magma", "qwen", "gpt-oss"])
+    parser.add_argument("--quantization", dest="model_quantization", choices=["auto", "4bit", "8bit", "none"])
+    parser.add_argument("--dtype", dest="model_dtype", choices=["auto", "float16", "bfloat16", "float32"])
+    parser.add_argument("--max-new-tokens", dest="model_max_new_tokens", type=int)
+    for option in ("device_map", "gpu_memory_limit", "offload_folder", "attn_implementation", "chat_template", "output_style"):
+        parser.add_argument("--" + option.replace("_", "-"), dest="model_" + option)
+    for option in ("use_cache", "enable_thinking", "allow_cpu_offload"):
+        parser.add_argument("--" + option.replace("_", "-"), dest="model_" + option,
+                            action=argparse.BooleanOptionalAction, default=None)
     args = vars(parser.parse_args(argv))
     config_path = args.pop("config")
     try:
         config = json.loads(Path(config_path).read_text(encoding="utf-8")) if config_path else {}
         if not isinstance(config, dict):
             raise ValueError("Configuration must be a JSON object")
-        for name in ("host", "port", "prompt_log_dir", ""):
-            if name and args.get(name) is not None:
+        for name in ("host", "port", "prompt_log_dir"):
+            if args.get(name) is not None:
                 config[name] = args[name]
-        for name in models:
-            value = config.get(name, {})
-            if isinstance(value, str):
-                value = {"path": value}
-            if not isinstance(value, dict):
-                raise ValueError(f"{name} must be a path or configuration object")
-            value = value.copy()
-            for key, option in args.items():
-                if key.startswith(name + "_") and option is not None:
-                    value[key[len(name) + 1:]] = option
-            config[name] = value
+        model_config = config.get("model", {})
+        if isinstance(model_config, str):
+            model_config = {"path": model_config}
+        if not isinstance(model_config, dict):
+            raise ValueError("model must be a path or configuration object")
+        model_config = model_config.copy()
+        for key, option in args.items():
+            if key.startswith("model_") and option is not None:
+                model_config[key.removeprefix("model_")] = option
+        config["model"] = model_config
         settings = Settings.model_validate(config)
     except (OSError, TypeError, ValueError) as error:
         parser.error(str(error))

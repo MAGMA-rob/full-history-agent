@@ -90,7 +90,7 @@ output. TSR adds its state snapshots and views. Errors retain these records.
 ## Migration and validation limits
 
 This replaces the former multi-agent server. Gen/bench are intentionally not
-migrated and cannot use protocol v2 until adapted. Specialized HTTP coaching and export are described below. Validation for this extraction covers compilation, imports and
+migrated and cannot use protocol v2 until adapted. HTTP coaching and local dataset export are described below. Validation for this extraction covers compilation, imports and
 packaging only; model inference and GPU quantization require separate validation.
 
 ## Coaching HTTP
@@ -119,22 +119,20 @@ Les backends doivent être accessibles depuis l'agent : dans Docker, `localhost`
 désigne le conteneur. Les adresses ne sont pas réécrites automatiquement.
 Déployer ensemble les versions compatibles de `magma_core`, `magma_gen` et de l'agent.
 
-## Dataset export service
-
-Start the dedicated process without inference models:
+## Local dataset export
 
 ```bash
-full-history-agent-export --host 127.0.0.1 --port 8100
-magma-gen export output --export-url http://127.0.0.1:8100 --skip-pre-made -n 2
+magma-gen export output --agent full-history-agent --skip-pre-made
 ```
 
-The service accepts producer-matched `/v1/export` batches and returns dataset rows.
-It loads no model, tokenizer or backend. Local seeded variants rename known robots
-consistently across prompts, input elements, legacy training columns and outputs;
-structured fields are not shuffled independently of their rendered prompt. No private
-options are currently accepted. Failed transformations return per-example errors.
+The installed package declares factories in `magma.export.gen` and
+`magma.export.offpolicy`. Export is a local Python call; there is no export HTTP
+server or export-server command. Runtime and coaching retain their HTTP APIs.
+The gen adapter does not rename, paraphrase or shuffle recorded data, and loads
+no inference model. Original prompts and raw responses remain in graph saves.
 
-Training rows retain component-specific columns and additionally carry full_prompt,
-input_elements and output_raw for faithful inspection of the recorded exchange.
-Gen writes JSONL datasets and an export manifest; consumers of the previous JSON arrays
-must adapt their dataset loading. No trainer changes are included here.
+Install the `offpolicy` extra to use the demonstration projector. Both input
+adapters use the agent's `export/rendering.py` for identical dataset columns and
+JSON encoding. The output follows the off-policy JSON-array conventions, with
+train/validation partitions by task and a versioned, verified export manifest.
+Off-policy paraphrase and summary backends are initialized only when needed.
