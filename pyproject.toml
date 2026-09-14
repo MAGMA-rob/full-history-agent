@@ -9,14 +9,24 @@ description = "Autonomous MAGMA HTTP agent"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "BSD-2-Clause"}
-dependencies = ["magma_core[interface]>=2.0.0,<3.0.0", "torch", "transformers", "accelerate", "bitsandbytes", "fastapi", "uvicorn", "pydantic>=2.4,<3", "openai-harmony", "protobuf"]
+dependencies = [
+    "magma_core[interface]>=2.0.0b1,<3.0.0",
+    "torch",
+    "transformers==5.17.0",
+    "accelerate==1.15.0",
+    "bitsandbytes==0.50.2",
+    "fastapi",
+    "uvicorn",
+    "pydantic>=2.4,<3",
+    "openai-harmony",
+    "protobuf"
+]
 
 [project.scripts]
 full-history-agent = "full_history_agent.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
 
 [project.entry-points."magma.export.gen"]
 full-history-agent = "full_history_agent.export.service:Exporter"
