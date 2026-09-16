@@ -1,0 +1,11 @@
+{
+  "model": {
+    "path": "Qwen/Qwen3-4B",
+    "format": "qwen",
+    "quantization": "none",
+    "dtype": "bfloat16",
+    "device_map": "auto",
+    "reasoning_effort": "medium",
+    "max_new_tokens": 4096
+  }
+}

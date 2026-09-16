@@ -37,3 +37,4 @@ full-history-agent = "full_history_agent.export.offpolicy.format:HRAgentFormat"
 
 [project.optional-dependencies]
 offpolicy = ["magma-offpolicy-gen>=0.1.0"]
+linear-attention = ["flash-linear-attention[cuda,conv1d]"]
