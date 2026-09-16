@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     for option in ("device_map", "gpu_memory_limit", "offload_folder", "attn_implementation", "chat_template", "output_style"):
         parser.add_argument("--" + option.replace("_", "-"), dest="model_" + option)
-    for option in ("use_cache", "enable_thinking", "allow_cpu_offload"):
+    for option in ("use_cache", "allow_cpu_offload"):
         parser.add_argument("--" + option.replace("_", "-"), dest="model_" + option,
                             action=argparse.BooleanOptionalAction, default=None)
     args = vars(parser.parse_args(argv))

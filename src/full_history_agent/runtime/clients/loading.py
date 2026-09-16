@@ -31,7 +31,6 @@ class CausalModelClient(BaseModelClient):
     def __init__(self, settings: ModelSettings, name: str) -> None:
         super().__init__(name=name, model_id=settings.path)
         self.use_cache = settings.use_cache
-        self.enable_thinking = settings.enable_thinking
         self.tokenizer = AutoTokenizer.from_pretrained(settings.path, padding_side="left")
         if settings.chat_template:
             self.tokenizer.chat_template = Path(settings.chat_template).read_text(encoding="utf-8")

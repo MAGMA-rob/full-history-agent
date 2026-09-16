@@ -13,7 +13,6 @@ class ModelSettings(BaseModel):
     reasoning_effort: Literal["low", "medium", "high"] = "low"
     attn_implementation: str | None = "sdpa"
     use_cache: bool = True
-    enable_thinking: bool = False
     device_map: str = "auto"
     gpu_memory_limit: str | None = None
     allow_cpu_offload: bool = False
