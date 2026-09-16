@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List
+from typing import Any, Dict, List
 from uuid import uuid4
 
 
@@ -82,6 +82,13 @@ class BaseModelClient(ABC):
                     + ("VALID\n" if valid else "INVALID\n")
                 )
                 path.write_text(content, encoding="utf-8")
+
+    def update_memory_after_response(
+        self,
+        memory: Dict[str, Any],
+        response: Dict[str, Any],
+    ) -> None:
+        """Apply model-specific private state after a valid response."""
 
     @abstractmethod
     def process_batched_entry(self, message: Any, inference_mode: bool) -> List[Any]:

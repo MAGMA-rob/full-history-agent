@@ -4,9 +4,9 @@ from typing import Dict, List, Optional
 import torch
 import json, os, re
 
-from .messages import BatchedMessageCommander, get_memory_list
+from ..messages import BatchedMessageCommander, get_memory_list
 from ..loading import CausalModelClient
-from .history import format_history_content, get_instruction_roles, map_chat_role
+from ..history import format_history_content, get_instruction_roles, map_chat_role
 
 TOOL_RE = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL)
 UNFINISHED_TOOL_RE = re.compile(r"<tool_call>\s*(.*)$", re.DOTALL)

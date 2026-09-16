@@ -13,12 +13,13 @@ dependencies = [
     "magma_core[interface]>=2.0.0b1,<3.0.0",
     "torch",
     "transformers==5.17.0",
+    "kernels==0.16.2",
     "accelerate==1.15.0",
     "bitsandbytes==0.50.2",
     "fastapi",
     "uvicorn",
     "pydantic>=2.4,<3",
-    "openai-harmony",
+    "openai-harmony==0.0.8",
     "protobuf"
 ]
 

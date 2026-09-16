@@ -7,8 +7,18 @@ from magma_core.protocol.agent import (
     AgentDecision, AgentError, AgentOutput, AgentRequest, ToolCall,
 )
 from full_history_agent.config import Settings
-from .clients.commander.messages import BatchedMessageCommander
+from .clients.harmony import HarmonyCommander
+from .clients.magma import MagmaCommander
+from .clients.messages import BatchedMessageCommander
 from .clients.loading import detect_format
+from .clients.qwen import QwenCommander
+
+
+COMMANDER_TYPES = {
+    "magma": MagmaCommander,
+    "qwen": QwenCommander,
+    "harmony": HarmonyCommander,
+}
 
 
 class Runtime:
@@ -16,15 +26,7 @@ class Runtime:
         model_settings = settings.model
         model_format = detect_format(model_settings)
         model_settings = model_settings.model_copy(update={"format": model_format})
-        if model_format == "qwen":
-            from .clients.commander.qwen_model import QwenCommander
-            self.commander = QwenCommander(model_settings)
-        elif model_format == "gpt-oss":
-            from .clients.commander.gpt_model import OSSCommander
-            self.commander = OSSCommander(model_settings)
-        else:
-            from .clients.commander.magma_model import MagmaCommander
-            self.commander = MagmaCommander(model_settings)
+        self.commander = COMMANDER_TYPES[model_format](model_settings)
         self.commander.set_prompt_log_dir(settings.prompt_log_dir)
 
     def validate_request(self, request: AgentRequest) -> None:
@@ -143,6 +145,7 @@ class Runtime:
                     )
                     continue
                 validities.append(True)
+                self.commander.update_memory_after_response(memory, answer)
                 action = {call.target_robot_name: {"name": call.name, "arguments": call.arguments}
                           for call in decision.tool_calls}
                 if len(action) != len(decision.tool_calls):
