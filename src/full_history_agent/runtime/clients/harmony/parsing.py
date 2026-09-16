@@ -10,7 +10,6 @@ from .tools import (
     ToolCatalog,
     actions_to_commander_format,
     parse_tool_call,
-    validate_actions,
 )
 
 
@@ -65,12 +64,8 @@ def messages_to_response(entries: Sequence[Any], catalog: ToolCatalog) -> Dict[s
         if recipient:
             kind, value = parse_tool_call(recipient, text, catalog)
             if kind == "clarification":
-                if clarification is not None or actions:
-                    raise ValueError("ask_user cannot be combined with environment tool calls")
                 clarification = value
             else:
-                if clarification is not None:
-                    raise ValueError("Environment tool calls cannot be combined with ask_user")
                 actions.extend(value)
             continue
         if channel == "final":
@@ -79,21 +74,22 @@ def messages_to_response(entries: Sequence[Any], catalog: ToolCatalog) -> Dict[s
         elif channel == "commentary" and text:
             commentary_parts.append(text)
 
-    if final_parts and (actions or clarification is not None):
-        raise ValueError("A final response cannot be combined with a tool call")
-    if clarification is not None:
-        return response(
-            say=clarification,
-            action={},
-            kind="clarification",
-            analysis=analysis,
-        )
     if actions:
-        validate_actions(actions, catalog)
         return response(
-            say="",
+            say=(
+                "\n".join(final_parts).strip()
+                or clarification
+                or "\n".join(commentary_parts).strip()
+            ),
             action=actions_to_commander_format(actions),
             kind="tool_call",
+            analysis=analysis,
+        )
+    if clarification is not None:
+        return response(
+            say="\n".join(final_parts).strip() or clarification,
+            action={},
+            kind="clarification",
             analysis=analysis,
         )
     if final_parts:
@@ -139,31 +135,24 @@ def parse_completion_fallback(
         for recipient, arguments in calls:
             kind, value = parse_tool_call(recipient, arguments, catalog)
             if kind == "clarification":
-                if clarification is not None or actions:
-                    raise ValueError("Mixed clarification and environment calls")
                 clarification = value
             else:
-                if clarification is not None:
-                    raise ValueError("Mixed clarification and environment calls")
                 actions.extend(value)
 
         analysis = [extract_channel_text(text, "analysis")]
         analysis = [item for item in analysis if item]
-        if final_text and (actions or clarification is not None):
-            raise ValueError("Mixed final response and function call")
-        if clarification is not None:
-            return response(
-                say=clarification,
-                action={},
-                kind="clarification",
-                analysis=analysis,
-            )
         if actions:
-            validate_actions(actions, catalog)
             return response(
-                say="",
+                say=final_text or clarification or "",
                 action=actions_to_commander_format(actions),
                 kind="tool_call",
+                analysis=analysis,
+            )
+        if clarification is not None:
+            return response(
+                say=final_text or clarification,
+                action={},
+                kind="clarification",
                 analysis=analysis,
             )
         if final_text:

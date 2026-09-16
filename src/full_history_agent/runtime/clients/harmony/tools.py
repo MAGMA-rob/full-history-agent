@@ -158,13 +158,12 @@ def parse_tool_call(
 
     if recipient == f"functions.{PARALLEL_TOOL}":
         calls = arguments.get("calls")
-        if not isinstance(calls, list) or len(calls) < 2:
-            raise ValueError("execute_parallel requires at least two calls")
-        actions = [_normalize_parsed_action(call, catalog) for call in calls]
-        validate_actions(actions, catalog)
+        if not isinstance(calls, list):
+            raise ValueError("execute_parallel calls must be a list")
+        actions = [_normalize_parsed_action(call) for call in calls]
         return "tool_call", actions
 
-    if not recipient.startswith("functions.") or name not in catalog.names:
+    if not recipient.startswith("functions."):
         raise ValueError(f"Unknown tool recipient {recipient!r}")
 
     target_robot = arguments.pop("target_robot", None)
@@ -173,7 +172,6 @@ def parse_tool_call(
         "arguments": arguments,
         "target_robot": target_robot,
     }
-    validate_actions([action], catalog)
     return "tool_call", [action]
 
 
@@ -298,7 +296,7 @@ def add_target_robot_parameter(
     return schema
 
 
-def _normalize_parsed_action(value: Any, catalog: ToolCatalog) -> Dict[str, Any]:
+def _normalize_parsed_action(value: Any) -> Dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("Each parallel call must be an object")
     action = {
@@ -306,7 +304,6 @@ def _normalize_parsed_action(value: Any, catalog: ToolCatalog) -> Dict[str, Any]
         "arguments": value.get("arguments", {}),
         "target_robot": value.get("target_robot"),
     }
-    validate_actions([action], catalog)
     return action
 
 
