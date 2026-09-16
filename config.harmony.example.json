@@ -3,6 +3,7 @@
     "path": "/models/gpt-oss-20b",
     "format": "harmony",
     "quantization": "auto",
+    "attn_implementation": "eager",
     "reasoning_effort": "medium",
     "max_new_tokens": 4096
   },
