@@ -11,7 +11,7 @@ from openai_harmony import (
 )
 
 from full_history_agent.config import ModelSettings
-from ...loading import CausalModelClient
+from ..loading import CausalModelClient
 from ..messages import BatchedMessageCommander, get_memory_list
 from ..history import get_instruction_roles
 from .conversation import build_conversation, update_analysis_memory
@@ -26,7 +26,7 @@ REASONING_EFFORTS = {
 }
 
 
-class OSSCommander(CausalModelClient):
+class HarmonyCommander(CausalModelClient):
     def __init__(self, settings: ModelSettings, name: str = "commander") -> None:
         self.encoding = self._load_harmony_encoding()
         self.stop_token_ids = self.encoding.stop_tokens_for_assistant_actions()
@@ -210,7 +210,7 @@ class OSSCommander(CausalModelClient):
             return load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
         except Exception as error:
             raise RuntimeError(
-                "OSSCommander could not initialize the GPT-OSS Harmony encoding. "
+                "HarmonyCommander could not initialize the GPT-OSS Harmony encoding. "
                 "Make sure openai-harmony can access or cache its vocabulary."
             ) from error
 

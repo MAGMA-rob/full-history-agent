@@ -5,9 +5,9 @@ import torch
 import json, re
 from pathlib import Path
 
-from .messages import BatchedMessageCommander, get_memory_list
+from ..messages import BatchedMessageCommander, get_memory_list
 from ..loading import CausalModelClient
-from .history import format_history_content, get_instruction_roles, map_chat_role
+from ..history import format_history_content, get_instruction_roles, map_chat_role
 
 from transformers import BitsAndBytesConfig
 
