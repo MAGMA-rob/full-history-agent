@@ -30,6 +30,11 @@ Alternatively, edit `config.example.json` with your model settings and run:
 full-history-agent --config config.example.json
 ```
 
+For GPT-OSS with the Harmony adapter, use `config.harmony.example.json` instead.
+The adapter exposes the internal `ask_user` and `execute_parallel` functions to
+the model; they are converted to MAGMA responses and are never sent to the
+robot tool executor as regular tools.
+
 For a local server, set `magma_agent_address` to `http://localhost:8888` in your
 MAGMA configuration. Use `full-history-agent --help` for available options.
 

@@ -19,10 +19,10 @@ def detect_format(settings: ModelSettings) -> str:
     config = AutoConfig.from_pretrained(settings.path)
     model_type = config.model_type.lower()
     if model_type == "gpt_oss":
-        return "gpt-oss"
+        return "harmony"
     if model_type.startswith("qwen"):
         return "qwen"
-    raise ValueError("Unknown model format; specify format=magma, qwen or gpt-oss")
+    raise ValueError("Unknown model format; specify format=magma, qwen or harmony")
 
 
 class CausalModelClient(BaseModelClient):
@@ -38,8 +38,7 @@ class CausalModelClient(BaseModelClient):
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         config = AutoConfig.from_pretrained(settings.path)
-        default_tokens = 1500 if settings.format == "qwen" else 2500
-        self.max_new_tokens = settings.max_new_tokens or default_tokens
+        self.max_new_tokens = settings.max_new_tokens
         native_quantization = getattr(config, "quantization_config", None)
         mode = settings.quantization
         if config.model_type == "gpt_oss" and mode != "auto":
@@ -82,4 +81,3 @@ class CausalModelClient(BaseModelClient):
     @property
     def input_device(self) -> torch.device:
         return self.model.get_input_embeddings().weight.device
-

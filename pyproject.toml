@@ -18,7 +18,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pydantic>=2.4,<3",
-    "openai-harmony",
+    "openai-harmony==0.0.8",
     "protobuf"
 ]
 

@@ -19,7 +19,7 @@ class Runtime:
         if model_format == "qwen":
             from .clients.commander.qwen_model import QwenCommander
             self.commander = QwenCommander(model_settings)
-        elif model_format == "gpt-oss":
+        elif model_format == "harmony":
             from .clients.commander.gpt_model import OSSCommander
             self.commander = OSSCommander(model_settings)
         else:
@@ -143,6 +143,7 @@ class Runtime:
                     )
                     continue
                 validities.append(True)
+                self.commander.update_memory_after_response(memory, answer)
                 action = {call.target_robot_name: {"name": call.name, "arguments": call.arguments}
                           for call in decision.tool_calls}
                 if len(action) != len(decision.tool_calls):
