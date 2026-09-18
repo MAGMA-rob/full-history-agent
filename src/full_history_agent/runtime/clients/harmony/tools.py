@@ -110,7 +110,6 @@ def tool_message_from_actions(actions: Sequence[Dict[str, Any]]) -> Message:
     if not actions:
         raise ValueError("Cannot build a Harmony tool call without an action")
 
-    validate_actions(actions)
     if len(actions) == 1:
         action = actions[0]
         arguments = dict(action.get("arguments", {}) or {})
@@ -173,32 +172,6 @@ def parse_tool_call(
         "target_robot": target_robot,
     }
     return "tool_call", [action]
-
-
-def validate_actions(
-    actions: Sequence[Dict[str, Any]],
-    catalog: ToolCatalog | None = None,
-) -> None:
-    robots = []
-    for action in actions:
-        name = action.get("name")
-        robot = action.get("target_robot")
-        arguments = action.get("arguments", {})
-        if not isinstance(name, str) or not name or name in RESERVED_TOOL_NAMES:
-            raise ValueError(f"Invalid environment tool name: {name!r}")
-        if not isinstance(robot, str) or not robot:
-            raise ValueError(f"Tool {name!r} requires a target_robot")
-        if not isinstance(arguments, dict):
-            raise ValueError(f"Arguments for tool {name!r} must be an object")
-        if catalog is not None:
-            if name not in catalog.names:
-                raise ValueError(f"Unknown environment tool {name!r}")
-            if robot not in catalog.known_robots:
-                raise ValueError(f"Unknown target robot {robot!r}")
-        robots.append(robot)
-
-    if len(robots) != len(set(robots)):
-        raise ValueError("A parallel response may contain at most one call per robot")
 
 
 def normalize_actions(action: Any) -> List[Dict[str, Any]]:
