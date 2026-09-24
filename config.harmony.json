@@ -1,11 +1,11 @@
 {
   "model": {
-    "path": "/models/gpt-oss-20b",
+    "path": "/models/gpt-oss",
     "format": "harmony",
     "quantization": "auto",
     "attn_implementation": "eager",
-    "reasoning_effort": "medium",
-    "history_max_messages": null,
+    "reasoning_effort": "low",
+    "history_max_messages": 32,
     "max_new_tokens": 4096
   },
   "prompt_log_dir": "logs/prompts"

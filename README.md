@@ -54,6 +54,19 @@ cp config.qwen.example.json config.qwen.json
 full-history-agent --config config.qwen.json
 ```
 
+For a local Qwen3.5 checkpoint, set `model.path` to its directory and
+`model.quantization` to `"fp8"` to quantize the weights at load time. Keep
+`model.dtype` as `"bfloat16"` for unquantized modules. The loader preserves the
+vision tower, output head and small recurrent gate projections in their original
+precision. The checkpoint on disk is unchanged.
+With Transformers 5.17, use a CUDA GPU with compute capability 8.9 or newer;
+on mixed-generation machines select a compatible GPU with `model.device_map`
+(for example `"cuda:0"`) instead of `"auto"`. GPU indices refer to the devices
+visible to the process, so account for `CUDA_VISIBLE_DEVICES` when launching.
+The Docker image pins PyTorch 2.9.1 with Triton 3.5.1. Rebuild older images:
+Triton 3.4 cannot import the autotuner used by the Transformers 5.17 FP8 kernel
+and fails on the first inference request with a `JITFunction` import error.
+
 For GPT-OSS, start from `config.harmony.example.json` instead.
 The adapter exposes the internal `ask_user` and `execute_parallel` functions to
 the model; they are converted to MAGMA responses and are never sent to the
@@ -70,6 +83,27 @@ full-history-agent --config config.qwen.json \
 
 For a local server, set `magma_agent_address` to `http://localhost:8888` in your
 MAGMA configuration. Use `full-history-agent --help` for available options.
+
+### Harmony history window
+
+Set `model.history_max_messages` to a positive integer (for example `20`) to
+include only the last N entries of `memory.history` in Harmony prompts. Omit it
+or set it to `null` to keep the full history. The CLI override is
+`--history-max-messages 20`. Zero, negative numbers, booleans, strings and
+fractional values in JSON are rejected. A configured limit is supported only
+for Harmony, including when the model format is detected automatically.
+
+This counts historical entries, not tokens or rendered Harmony messages.
+System/developer instructions, permanent rules, tools and the current input
+with its attributes are always included outside that limit. The cutoff is
+strict: a tool result whose call was removed is rendered as standalone context.
+No summarization or preservation of the original task outside the window is added.
+
+The returned memory remains complete, including GPT-OSS analysis indices.
+Inference and coaching use the same window. Logged `input_elements.history`
+contains the selected entries, `history_start_index` gives their original offset,
+and `full_prompt` records the actual model prompt. This reduces prompt context,
+not the size of returned memory or a guaranteed token budget.
 
 ## Dataset export
 

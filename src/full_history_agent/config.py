@@ -7,9 +7,10 @@ class ModelSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     path: str = Field(min_length=1)
     format: Literal["auto", "magma", "qwen", "harmony"] = "auto"
-    quantization: Literal["auto", "4bit", "8bit", "none"] = "auto"
+    quantization: Literal["auto", "4bit", "8bit", "fp8", "none"] = "auto"
     dtype: Literal["auto", "float16", "bfloat16", "float32"] = "auto"
     max_new_tokens: int = Field(default=2048, gt=0)
+    history_max_messages: int | None = Field(default=None, gt=0, strict=True)
     reasoning_effort: Literal["low", "medium", "high"] = "low"
     attn_implementation: str | None = "sdpa"
     use_cache: bool = True

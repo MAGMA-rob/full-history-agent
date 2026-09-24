@@ -28,6 +28,17 @@ GPT_OSS_MEMORY_KEY = "_gpt_oss"
 GPT_OSS_MEMORY_VERSION = 1
 
 
+def history_window_start(
+    history: Sequence[Dict[str, Any]],
+    history_max_messages: int | None,
+) -> int:
+    if history_max_messages is None:
+        return 0
+    if type(history_max_messages) is not int or history_max_messages <= 0:
+        raise ValueError("history_max_messages must be a positive integer or None")
+    return max(0, len(history) - history_max_messages)
+
+
 def build_conversation(
     *,
     history: Sequence[Dict[str, Any]],
@@ -38,6 +49,7 @@ def build_conversation(
     tools: Sequence[ToolDescription],
     reasoning_effort: ReasoningEffort,
     memory: Dict[str, Any],
+    history_max_messages: int | None = None,
 ) -> Conversation:
     turns = validate_analysis_state(memory, history)
     system_content = (
@@ -57,7 +69,8 @@ def build_conversation(
     ]
     pending_recipient: Optional[str] = None
 
-    for index, previous_message in enumerate(history):
+    start_index = history_window_start(history, history_max_messages)
+    for index, previous_message in enumerate(history[start_index:], start=start_index):
         author = previous_message.get("author")
         normalized_author = (author or "USER").lower()
         content = get_history_content(previous_message)
