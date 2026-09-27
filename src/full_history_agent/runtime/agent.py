@@ -9,6 +9,8 @@ from magma_core.protocol.agent import (
 from full_history_agent.config import Settings
 from .clients.harmony import HarmonyCommander
 from .clients.magma import MagmaCommander
+from .clients.llama import LlamaCommander
+from .clients.llama.parsing import invalid_response
 from .clients.messages import BatchedMessageCommander
 from .clients.loading import detect_format
 from .clients.qwen import QwenCommander
@@ -18,6 +20,7 @@ COMMANDER_TYPES = {
     "magma": MagmaCommander,
     "qwen": QwenCommander,
     "harmony": HarmonyCommander,
+    "llama": LlamaCommander,
 }
 
 
@@ -68,14 +71,19 @@ class Runtime:
                 ],
             )
             self.commander.exchanges.clear()
+            is_llama = isinstance(self.commander, LlamaCommander)
             if coached:
                 prompts = self.commander._format_batch(message)
                 answers = []
                 exchanges = []
-                for entry, prompt in zip(inputs, prompts):
+                for position, (entry, prompt) in enumerate(zip(inputs, prompts)):
                     correction = entry.extra_keys["coaching"]
                     answer = None
+                    raw_output = json.dumps(correction)
+                    diagnostic = None
                     try:
+                        if is_llama and "error" in self.commander.input_elements[position]:
+                            raise ValueError(self.commander.input_elements[position]["error"])
                         if not isinstance(correction, dict):
                             raise ValueError("coaching must be an object")
                         if correction.get("kind") == "replace_say":
@@ -89,16 +97,36 @@ class Runtime:
                             {call.target_robot_name: {"name": call.name, "arguments": call.arguments}}
                             for call in decision.tool_calls
                         ]}
-                    except (TypeError, ValueError, KeyError):
-                        pass
+                        answer, raw_output = self.commander.format_coached_response(answer)
+                        if is_llama and not answer.get("_llama_valid"):
+                            diagnostic = answer.get("_llama_error")
+                    except Exception as error:
+                        if not is_llama and not isinstance(error, (TypeError, ValueError, KeyError)):
+                            raise
+                        answer = None
+                        diagnostic = str(error)
                     answers.append(answer)
-                    exchanges.append({"prompt": prompt, "raw_output": json.dumps(answer if answer is not None else correction),
-                                      "valid": answer is not None})
+                    exchanges.append({"prompt": prompt, "raw_output": raw_output,
+                                      "valid": answer is not None and diagnostic is None, "error": diagnostic})
             else:
-                answers = self.commander.process_batched_entry(message, inference_mode)
-                exchanges = self.commander.exchanges
+                try:
+                    answers = self.commander.process_batched_entry(message, inference_mode)
+                    exchanges = self.commander.exchanges
+                except Exception as error:
+                    if not is_llama:
+                        raise
+                    answers = [invalid_response(error) for _ in candidates]
+                    exchanges = [{"prompt": "", "raw_output": "", "valid": False, "error": str(error)}
+                                 for _ in candidates]
+                    self.commander.input_elements = [{} for _ in candidates]
             if len(answers) != len(candidates) or len(exchanges) != len(candidates):
-                raise RuntimeError("Model batch size or recorded exchanges do not match candidates")
+                if not is_llama:
+                    raise RuntimeError("Model batch size or recorded exchanges do not match candidates")
+                diagnostic = "Model batch size or recorded exchanges do not match candidates"
+                answers = [invalid_response(diagnostic) for _ in candidates]
+                exchanges = [{"prompt": "", "raw_output": "", "valid": False, "error": diagnostic}
+                             for _ in candidates]
+                self.commander.input_elements = [{} for _ in candidates]
             validities = []
             for position, ((entry, index), answer, exchange) in enumerate(zip(candidates, answers, exchanges)):
                 memory = deepcopy(entry.memory)
@@ -107,6 +135,10 @@ class Runtime:
                     "full_prompt": exchange["prompt"], "output_raw": exchange["raw_output"],
                     "input_elements": deepcopy(self.commander.input_elements[position]),
                 }]
+                if exchange.get("error"):
+                    steps[0]["error"] = exchange["error"]
+                if exchange.get("logging_error"):
+                    steps[0]["logging_error"] = exchange["logging_error"]
                 try:
                     if isinstance(answer, str):
                         answer = json.loads(answer)
@@ -137,32 +169,47 @@ class Runtime:
                                 ))
                     decision = AgentDecision(say=answer.get("say", ""), tool_calls=calls)
                     if exchange.get("valid") is False:
-                        raise ValueError("Model parser rejected its raw response")
+                        raise ValueError(exchange.get("error") or "Model parser rejected its raw response")
                 except (TypeError, ValueError) as error:
+                    diagnostic = exchange.get("error") or str(error)
+                    if is_llama:
+                        steps[0]["error"] = diagnostic
                     validities.append(False)
                     results[(entry.id, index)] = AgentOutput(
                         request_id=request.request_id, source_id=entry.id, candidate_index=index,
                         status="error", memory=memory, internal_steps=steps,
-                        error=AgentError(code="invalid_output", message=str(error), component="commander"),
+                        error=AgentError(code="invalid_output", message=diagnostic, component="commander"),
+                    )
+                    continue
+                try:
+                    self.commander.update_memory_after_response(memory, answer)
+                    action = {call.target_robot_name: {"name": call.name, "arguments": call.arguments}
+                              for call in decision.tool_calls}
+                    if is_llama or len(action) != len(decision.tool_calls):
+                        action = [{call.target_robot_name: {"name": call.name, "arguments": call.arguments}}
+                                  for call in decision.tool_calls]
+                    memory.setdefault("history", []).extend([
+                        {"author": "USER" if entry.instruction.type == "user" else "SYSTEM",
+                         "content": entry.instruction.content},
+                        {"author": "MODEL", "content": json.dumps(
+                            {"say": decision.say, "action": action}, ensure_ascii=False)},
+                    ])
+                    results[(entry.id, index)] = AgentOutput(
+                        request_id=request.request_id, source_id=entry.id, candidate_index=index,
+                        status="completed", memory=memory, internal_steps=steps, output=decision,
+                    )
+                except Exception as error:
+                    if not is_llama:
+                        raise
+                    validities.append(False)
+                    steps[0]["error"] = str(error)
+                    results[(entry.id, index)] = AgentOutput(
+                        request_id=request.request_id, source_id=entry.id, candidate_index=index,
+                        status="error", memory=deepcopy(entry.memory), internal_steps=steps,
+                        error=AgentError(code="invalid_output", message=str(error) or "Llama memory update failed", component="commander"),
                     )
                     continue
                 validities.append(True)
-                self.commander.update_memory_after_response(memory, answer)
-                action = {call.target_robot_name: {"name": call.name, "arguments": call.arguments}
-                          for call in decision.tool_calls}
-                if len(action) != len(decision.tool_calls):
-                    action = [{call.target_robot_name: {"name": call.name, "arguments": call.arguments}}
-                              for call in decision.tool_calls]
-                memory.setdefault("history", []).extend([
-                    {"author": "USER" if entry.instruction.type == "user" else "SYSTEM",
-                     "content": entry.instruction.content},
-                    {"author": "MODEL", "content": json.dumps(
-                        {"say": decision.say, "action": action}, ensure_ascii=False)},
-                ])
-                results[(entry.id, index)] = AgentOutput(
-                    request_id=request.request_id, source_id=entry.id, candidate_index=index,
-                    status="completed", memory=memory, internal_steps=steps, output=decision,
-                )
             if not coached:
                 self.commander.update_prompt_log_validity(validities)
         return [results[(entry.id, index)] for entry in request.inputs for index in range(entry.num_outputs)]

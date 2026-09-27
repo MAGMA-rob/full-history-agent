@@ -25,7 +25,9 @@ def detect_format(settings: ModelSettings) -> str:
         return "harmony"
     if model_type.startswith("qwen"):
         return "qwen"
-    raise ValueError("Unknown model format; specify format=magma, qwen or harmony")
+    if model_type == "llama":
+        return "llama"
+    raise ValueError("Unknown model format; specify format=magma, qwen, harmony or llama")
 
 
 class CausalModelClient(BaseModelClient):

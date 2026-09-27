@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from datetime import datetime
+import json
 from pathlib import Path
 from typing import Any, Dict, List
 from uuid import uuid4
@@ -82,6 +83,10 @@ class BaseModelClient(ABC):
                     + ("VALID\n" if valid else "INVALID\n")
                 )
                 path.write_text(content, encoding="utf-8")
+
+    def format_coached_response(self, response: Dict[str, Any]) -> tuple[Dict[str, Any], str]:
+        """Return the decision and its model-specific recorded completion."""
+        return response, json.dumps(response)
 
     def update_memory_after_response(
         self,

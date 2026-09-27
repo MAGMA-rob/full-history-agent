@@ -33,6 +33,9 @@ class CoachingService:
             call.target_robot_name: {'name': call.name, 'arguments': call.arguments}
             for call in target.output.tool_calls
         }
+        if target.output is not None and len(action) != len(target.output.tool_calls):
+            action = [{call.target_robot_name: {'name': call.name, 'arguments': call.arguments}}
+                      for call in target.output.tool_calls]
         rejected = {'say': '' if target.output is None else target.output.say, 'action': action}
         goal = request.stage.goal
         if request.active_errors:

@@ -1,0 +1,10 @@
+{
+  "model": {
+    "path": "meta-llama/Llama-3.1-8B-Instruct",
+    "format": "llama",
+    "quantization": "none",
+    "dtype": "auto",
+    "device_map": "auto",
+    "max_new_tokens": 2048
+  }
+}
