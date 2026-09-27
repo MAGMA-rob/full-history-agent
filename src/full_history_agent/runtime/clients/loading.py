@@ -2,7 +2,10 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import (
+    AutoConfig, AutoModelForCausalLM, AutoModelForImageTextToText,
+    AutoTokenizer, BitsAndBytesConfig, FineGrainedFP8Config,
+)
 
 from full_history_agent.config import ModelSettings
 from .base import BaseModelClient
@@ -31,7 +34,6 @@ class CausalModelClient(BaseModelClient):
     def __init__(self, settings: ModelSettings, name: str) -> None:
         super().__init__(name=name, model_id=settings.path)
         self.use_cache = settings.use_cache
-        self.enable_thinking = settings.enable_thinking
         self.tokenizer = AutoTokenizer.from_pretrained(settings.path, padding_side="left")
         if settings.chat_template:
             self.tokenizer.chat_template = Path(settings.chat_template).read_text(encoding="utf-8")
@@ -69,13 +71,25 @@ class CausalModelClient(BaseModelClient):
                 load_in_8bit=True,
                 llm_int8_enable_fp32_cpu_offload=settings.allow_cpu_offload,
             )
+        elif mode == "fp8":
+            # Qwen3.5's recurrent gates have fewer than 128 output channels;
+            # keep them and the vision tower outside blockwise FP8 quantization.
+            excluded = ["lm_head"]
+            if config.model_type in {"qwen3_5", "qwen3_5_text", "qwen3_5_moe", "qwen3_5_moe_text"}:
+                excluded.extend(["visual", "in_proj_a", "in_proj_b"])
+            kwargs["quantization_config"] = FineGrainedFP8Config(
+                modules_to_not_convert=excluded,
+            )
         if settings.gpu_memory_limit:
             kwargs["max_memory"] = {
                 index: settings.gpu_memory_limit for index in range(torch.cuda.device_count())
             }
         if settings.allow_cpu_offload:
             kwargs["offload_folder"] = settings.offload_folder
-        self.model = AutoModelForCausalLM.from_pretrained(settings.path, **kwargs)
+        model_class = AutoModelForCausalLM
+        if config.model_type in {"qwen3_5", "qwen3_5_moe"}:
+            model_class = AutoModelForImageTextToText
+        self.model = model_class.from_pretrained(settings.path, **kwargs)
         self.model.eval()
 
     @property

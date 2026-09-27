@@ -14,7 +14,7 @@ from full_history_agent.config import ModelSettings
 from ..loading import CausalModelClient
 from ..messages import BatchedMessageCommander, get_memory_list
 from ..history import get_instruction_roles
-from .conversation import build_conversation, update_analysis_memory
+from .conversation import build_conversation, history_window_start, update_analysis_memory
 from .parsing import parse_completion
 from .tools import ToolCatalog, build_tool_descriptions
 
@@ -30,6 +30,7 @@ class HarmonyCommander(CausalModelClient):
     def __init__(self, settings: ModelSettings, name: str = "commander") -> None:
         self.encoding = self._load_harmony_encoding()
         self.stop_token_ids = self.encoding.stop_tokens_for_assistant_actions()
+        self.history_max_messages = settings.history_max_messages
         self.reasoning_effort = REASONING_EFFORTS[settings.reasoning_effort]
         super().__init__(settings, name)
 
@@ -58,6 +59,7 @@ class HarmonyCommander(CausalModelClient):
                 tools=tools,
                 reasoning_effort=self.reasoning_effort,
                 memory=memory,
+                history_max_messages=self.history_max_messages,
             )
             prefill_ids.append(
                 self.encoding.render_conversation_for_completion(
@@ -66,8 +68,10 @@ class HarmonyCommander(CausalModelClient):
                 )
             )
             catalogs.append(catalog)
+            start_index = history_window_start(message.history[index], self.history_max_messages)
             self.input_elements.append({
-                "history": message.history[index],
+                "history": message.history[index][start_index:],
+                "history_start_index": start_index,
                 "instruction": instruction,
                 "instruction_role": instruction_roles[index],
                 "attributes": message.attributes[index],

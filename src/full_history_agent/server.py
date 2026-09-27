@@ -78,8 +78,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--prompt-log-dir")
     parser.add_argument("--model", dest="model_path")
     parser.add_argument("--model-format", dest="model_format", choices=["auto", "magma", "qwen", "harmony"])
-    parser.add_argument("--quantization", dest="model_quantization", choices=["auto", "4bit", "8bit", "none"])
+    parser.add_argument("--quantization", dest="model_quantization", choices=["auto", "4bit", "8bit", "fp8", "none"])
     parser.add_argument("--dtype", dest="model_dtype", choices=["auto", "float16", "bfloat16", "float32"])
+    parser.add_argument("--history-max-messages", dest="model_history_max_messages", type=int)
     parser.add_argument("--max-new-tokens", dest="model_max_new_tokens", type=int)
     parser.add_argument(
         "--reasoning-effort",
@@ -88,7 +89,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     for option in ("device_map", "gpu_memory_limit", "offload_folder", "attn_implementation", "chat_template", "output_style"):
         parser.add_argument("--" + option.replace("_", "-"), dest="model_" + option)
-    for option in ("use_cache", "enable_thinking", "allow_cpu_offload"):
+    for option in ("use_cache", "allow_cpu_offload"):
         parser.add_argument("--" + option.replace("_", "-"), dest="model_" + option,
                             action=argparse.BooleanOptionalAction, default=None)
     args = vars(parser.parse_args(argv))

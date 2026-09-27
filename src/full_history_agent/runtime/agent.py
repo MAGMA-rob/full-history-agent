@@ -25,6 +25,8 @@ class Runtime:
     def __init__(self, settings: Settings) -> None:
         model_settings = settings.model
         model_format = detect_format(model_settings)
+        if model_settings.history_max_messages is not None and model_format != "harmony":
+            raise ValueError("history_max_messages is currently supported only for harmony")
         model_settings = model_settings.model_copy(update={"format": model_format})
         self.commander = COMMANDER_TYPES[model_format](model_settings)
         self.commander.set_prompt_log_dir(settings.prompt_log_dir)
