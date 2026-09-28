@@ -36,6 +36,8 @@ class Runtime:
 
     def validate_request(self, request: AgentRequest) -> None:
         for entry in request.inputs:
+            if isinstance(self.commander, LlamaCommander) and "coaching" in entry.extra_keys:
+                raise ValueError("Coaching is unavailable for the Llama model format")
             history = entry.memory.get("history", [])
             if not isinstance(history, list) or any(not isinstance(item, dict) for item in history):
                 raise ValueError("memory.history must be a list of objects")
@@ -82,8 +84,6 @@ class Runtime:
                     raw_output = json.dumps(correction)
                     diagnostic = None
                     try:
-                        if is_llama and "error" in self.commander.input_elements[position]:
-                            raise ValueError(self.commander.input_elements[position]["error"])
                         if not isinstance(correction, dict):
                             raise ValueError("coaching must be an object")
                         if correction.get("kind") == "replace_say":
@@ -98,10 +98,8 @@ class Runtime:
                             for call in decision.tool_calls
                         ]}
                         answer, raw_output = self.commander.format_coached_response(answer)
-                        if is_llama and not answer.get("_llama_valid"):
-                            diagnostic = answer.get("_llama_error")
                     except Exception as error:
-                        if not is_llama and not isinstance(error, (TypeError, ValueError, KeyError)):
+                        if not isinstance(error, (TypeError, ValueError, KeyError)):
                             raise
                         answer = None
                         diagnostic = str(error)

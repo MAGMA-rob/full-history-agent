@@ -34,44 +34,26 @@ def decision_from_response(response: dict[str, Any]) -> AgentDecision:
     return AgentDecision(say=response.get("say", ""), tool_calls=calls)
 
 
-def native_calls_from_decision(
-    decision: AgentDecision,
-    *,
-    clarification: bool = False,
-) -> list[dict[str, Any]]:
-    if clarification:
-        return [{"type": "function", "name": ASK_USER_TOOL, "parameters": {"question": decision.say}}]
-    return [{
-        "type": "function",
-        "name": call.name,
-        "parameters": {**call.arguments, "target_robot": call.target_robot_name},
-    } for call in decision.tool_calls]
-
-
-def serialize_decision(decision: AgentDecision, *, clarification: bool = False) -> str:
-    """Render a native completion for inference history or an ideal target."""
-    calls = native_calls_from_decision(decision, clarification=clarification)
-    if not calls:
-        return decision.say + "<|eot_id|>"
-    payload = calls[0] if len(calls) == 1 else calls
-    prefix = decision.say if not clarification else ""
-    return (
-        prefix + "<|python_tag|>"
-        + json.dumps(payload, ensure_ascii=False, allow_nan=False)
-        + "<|eom_id|>"
-    )
-
-
 def assistant_message(decision: AgentDecision, *, clarification: bool = False) -> dict[str, Any]:
-    native_calls = native_calls_from_decision(decision, clarification=clarification)
-    message: dict[str, Any] = {
-        "role": "assistant",
-        "content": "" if clarification else decision.say,
-        "llama_completion": serialize_decision(decision, clarification=clarification),
-    }
-    if native_calls:
+    """Represent one call natively; keep the semicolon extension in assistant content."""
+    if clarification:
+        calls = [{"name": ASK_USER_TOOL, "parameters": {"question": decision.say}}]
+    else:
+        calls = [{
+            "name": call.name,
+            "parameters": {**call.arguments, "target_robot": call.target_robot_name},
+        } for call in decision.tool_calls]
+
+    if len(calls) > 1:
+        # The checkpoint chat template appends the message terminator.
+        payload = "; ".join(json.dumps(call, ensure_ascii=False, allow_nan=False) for call in calls)
+        return {"role": "assistant", "content": decision.say + "<|python_tag|>" + payload}
+
+    message: dict[str, Any] = {"role": "assistant", "content": "" if clarification else decision.say}
+    if calls:
+        call = calls[0]
         message["tool_calls"] = [{
             "type": "function",
             "function": {"name": call["name"], "arguments": call["parameters"]},
-        } for call in native_calls]
+        }]
     return message

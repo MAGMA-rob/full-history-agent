@@ -8,16 +8,12 @@ from ..loading import CausalModelClient
 from ..messages import BatchedMessageCommander, get_memory_list
 from .conversation import build_messages, update_clarification_memory
 from .parsing import TERMINAL_TOKENS, invalid_response, parse_completion
-from .serialization import decision_from_response, serialize_decision
-from .template import LLAMA_CHAT_TEMPLATE
 from .tools import build_tool_descriptions
 
 
 class LlamaCommander(CausalModelClient):
     def __init__(self, settings: ModelSettings, name: str = "commander") -> None:
         super().__init__(settings, name)
-        if not settings.chat_template:
-            self.tokenizer.chat_template = LLAMA_CHAT_TEMPLATE
         self.stop_token_ids = [self.tokenizer.convert_tokens_to_ids(token) for token in TERMINAL_TOKENS]
         if any(
             not isinstance(token_id, int) or token_id == self.tokenizer.unk_token_id
@@ -102,10 +98,6 @@ class LlamaCommander(CausalModelClient):
             if not response.get("_llama_valid"):
                 self.exchanges[-1]["error"] = response["_llama_error"]
         return responses
-
-    def format_coached_response(self, response: dict[str, Any]) -> tuple[dict[str, Any], str]:
-        raw = serialize_decision(decision_from_response(response))
-        return parse_completion(raw), raw
 
     def update_memory_after_response(self, memory: dict[str, Any], response: dict[str, Any]) -> None:
         update_clarification_memory(memory, response)

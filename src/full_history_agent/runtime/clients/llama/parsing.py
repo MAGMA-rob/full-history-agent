@@ -33,10 +33,28 @@ def parse_completion(text: str) -> dict[str, Any]:
             return {"say": content, "action": {}, "_llama_kind": "final", "_llama_valid": True}
 
         visible, payload = content.split(marker, 1)
-        decoded = json.loads(payload)
-        native_calls = decoded if isinstance(decoded, list) else [decoded]
+        decoder = json.JSONDecoder()
+        native_calls: list[dict[str, Any]] = []
+        offset = 0
+        while offset < len(payload):
+            while offset < len(payload) and payload[offset].isspace():
+                offset += 1
+            if offset == len(payload):
+                break
+            native, offset = decoder.raw_decode(payload, offset)
+            if not isinstance(native, dict):
+                return invalid_response("Llama tool call must be a JSON object")
+            native_calls.append(native)
+            while offset < len(payload) and payload[offset].isspace():
+                offset += 1
+            if offset < len(payload):
+                if payload[offset] != ";":
+                    return invalid_response("Llama tool calls must be separated by semicolons")
+                offset += 1
+                if not payload[offset:].strip():
+                    return invalid_response("Llama tool call sequence ends with a semicolon")
         if not native_calls:
-            return invalid_response("Llama tool call list is empty")
+            return invalid_response("Llama tool request is empty")
         calls = []
         question = None
         for native in native_calls:

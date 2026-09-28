@@ -48,7 +48,7 @@ def build_messages(
     memory: dict[str, Any],
 ) -> list[dict[str, Any]]:
     turns = clarification_turns(memory, history)
-    messages: list[dict[str, Any]] = [{"role": "system", "content": build_system_prompt(permanent_rules)}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": build_system_prompt(permanent_rules, attributes)}]
     pending_kind: str | None = None
     for index, previous in enumerate(history):
         author = str(previous.get("author") or "USER").lower()

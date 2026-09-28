@@ -14,6 +14,7 @@ from magma_core.workers.coaching_sessions import CoachingSessions, mount_coachin
 
 def create_app(settings: Settings):
     from fastapi import FastAPI, HTTPException
+    from fastapi.responses import JSONResponse
 
     sessions = CoachingSessions(supported=True)
 
@@ -26,6 +27,9 @@ def create_app(settings: Settings):
         try:
             from .runtime.agent import Runtime
             app.state.runtime = await loop.run_in_executor(executor, Runtime, settings)
+            from .runtime.clients.llama import LlamaCommander
+            app.state.coaching_supported = not isinstance(app.state.runtime.commander, LlamaCommander)
+            sessions.supported = app.state.coaching_supported
             yield
         finally:
             # An inference already running remains exclusive even after HTTP cancellation.
@@ -34,6 +38,13 @@ def create_app(settings: Settings):
             await asyncio.to_thread(sessions.close_all)
 
     app = FastAPI(title="full-history-agent", version=__version__, lifespan=lifespan)
+    app.state.coaching_supported = settings.model.format != "llama"
+
+    @app.middleware("http")
+    async def reject_llama_coaching(request, call_next):
+        if request.url.path.startswith("/v1/coaching") and not app.state.coaching_supported:
+            return JSONResponse(status_code=503, content={"detail": "Coaching is unavailable for the Llama model format"})
+        return await call_next(request)
 
     @app.get("/health", response_model=AgentHealth)
     async def health():
@@ -43,11 +54,13 @@ def create_app(settings: Settings):
 
     @app.get("/v1/info", response_model=AgentInfo)
     async def info():
+        coaching_supported = app.state.coaching_supported
         return AgentInfo(agent_id="full-history-agent", agent_version=__version__,
-                         specialized_coaching=["failure", "suboptimal", "format"],
-                         coaching_session_version="1",
-                         coaching_resume=True,
-                         capabilities={"inference": True, "coaching": True})
+                         specialized_coaching=["failure", "suboptimal", "format"] if coaching_supported else [],
+                         coaching_session_version="1" if coaching_supported else None,
+                         coaching_resume=coaching_supported,
+                         coaching_unavailable_reason=None if coaching_supported else "Coaching is unavailable for the Llama model format",
+                         capabilities={"inference": True, "coaching": coaching_supported})
 
     @app.post("/v1/responses", response_model=AgentResponse)
     async def responses(request: AgentRequest):
