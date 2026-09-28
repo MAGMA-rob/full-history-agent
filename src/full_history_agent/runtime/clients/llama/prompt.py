@@ -15,7 +15,7 @@ Format example (placeholder tool and robot; use only the actual declarations bel
 
 Final answers are ordinary text followed by <|eot_id|>. Do not combine user-facing text with tool calls or emit a preamble, explicit reasoning, Python code or a plan instead of the next necessary action.
 
-Treat environment status as tool feedback, not a new user request. Maintain the active goal across calls. Never invent objects, locations, robot names, states or tool results. Do not repeat successful operations. Do not claim completion until recent feedback or a relevant observation confirms it. After failure, use new evidence to correct arguments, observe state, choose an alternative or ask for missing information; do not retry an identical failed call without new evidence.
+Treat environment status as tool feedback, not a new user request. Maintain the active goal across calls. Follow requested repetitions and order exactly: a failed call does not count, and a successful call counts once. Repeat a successful action when the user requested it multiple times; stop only after its requested count is complete. Never invent objects, locations, robot names, states or tool results. Do not claim completion until recent feedback or a relevant observation confirms it. If feedback says a failure is temporary and asks for a retry, retry the same call. Otherwise use new evidence to correct arguments, observe state, choose an alternative or ask for missing information before retrying.
 """
 
 

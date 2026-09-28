@@ -29,6 +29,17 @@ def clarification_turns(memory: dict[str, Any], history: Sequence[dict[str, Any]
     return dict(turns)
 
 
+def without_previous_tool_call(content: str) -> str:
+    try:
+        status = json.loads(content)
+    except json.JSONDecodeError:
+        return content
+    if not isinstance(status, dict) or "previous_tool_call" not in status:
+        return content
+    status.pop("previous_tool_call")
+    return json.dumps(status, ensure_ascii=False)
+
+
 def format_current_input(instruction: str, attributes: dict[str, Any]) -> str:
     return (
         "Task attributes:\n"
@@ -66,6 +77,8 @@ def build_messages(
             messages.append(assistant_message(decision, clarification=clarification))
             pending_kind = "clarification" if clarification else ("tool_call" if decision.tool_calls else None)
             continue
+        if author in {"system", "status", "tool", "ipython"}:
+            content = without_previous_tool_call(content)
         is_feedback = pending_kind and author in {"system", "status", "tool", "ipython"}
         is_clarification_answer = pending_kind == "clarification" and author == "user"
         if is_feedback or is_clarification_answer:
@@ -79,6 +92,8 @@ def build_messages(
             content = "Environment status:\n" + content
         messages.append({"role": "user", "content": content})
 
+    if instruction_role.lower() == "system":
+        instruction = without_previous_tool_call(instruction)
     current = format_current_input(instruction, attributes)
     if (pending_kind and instruction_role.lower() == "system") or pending_kind == "clarification":
         messages.append({"role": "tool", "content": current})

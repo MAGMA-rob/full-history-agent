@@ -30,9 +30,21 @@ def parse_completion(text: str) -> dict[str, Any]:
         if marker not in content:
             if terminal == "<|eom_id|>":
                 return invalid_response("Llama tool request has no python_tag")
-            return {"say": content, "action": {}, "_llama_kind": "final", "_llama_valid": True}
-
-        visible, payload = content.split(marker, 1)
+            try:
+                native = json.loads(content)
+            except json.JSONDecodeError:
+                native = None
+            if not (
+                isinstance(native, dict)
+                and isinstance(native.get("name"), str)
+                and isinstance(native.get("parameters"), dict)
+            ):
+                return {"say": content, "action": {}, "_llama_kind": "final", "_llama_valid": True}
+            # The checkpoint template can render historical tool calls as bare JSON.
+            # Treat that exact shape as a tool request if the model repeats it.
+            visible, payload = "", content
+        else:
+            visible, payload = content.split(marker, 1)
         decoder = json.JSONDecoder()
         native_calls: list[dict[str, Any]] = []
         offset = 0

@@ -43,6 +43,14 @@ class LlamaCommander(CausalModelClient):
                 prompt = self.tokenizer.apply_chat_template(
                     messages, tools=tools, tokenize=False, add_generation_prompt=True,
                 )
+                # The checkpoint template appends eot to assistant content, including
+                # tool calls. Keep the eom handoff already present in tool history.
+                assistant_header = "<|start_header_id|>assistant<|end_header_id|>\n\n"
+                for item in messages:
+                    content = item.get("content", "").strip()
+                    if item["role"] == "assistant" and content.endswith("<|eom_id|>"):
+                        rendered = assistant_header + content
+                        prompt = prompt.replace(rendered + "<|eot_id|>", rendered)
                 prompts.append(prompt)
                 self.input_elements.append(elements)
             except Exception as error:

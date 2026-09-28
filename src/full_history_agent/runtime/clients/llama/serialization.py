@@ -35,7 +35,7 @@ def decision_from_response(response: dict[str, Any]) -> AgentDecision:
 
 
 def assistant_message(decision: AgentDecision, *, clarification: bool = False) -> dict[str, Any]:
-    """Represent one call natively; keep the semicolon extension in assistant content."""
+    """Render tool history in the same format requested from the model."""
     if clarification:
         calls = [{"name": ASK_USER_TOOL, "parameters": {"question": decision.say}}]
     else:
@@ -44,16 +44,12 @@ def assistant_message(decision: AgentDecision, *, clarification: bool = False) -
             "parameters": {**call.arguments, "target_robot": call.target_robot_name},
         } for call in decision.tool_calls]
 
-    if len(calls) > 1:
-        # The checkpoint chat template appends the message terminator.
-        payload = "; ".join(json.dumps(call, ensure_ascii=False, allow_nan=False) for call in calls)
-        return {"role": "assistant", "content": decision.say + "<|python_tag|>" + payload}
+    if not calls:
+        return {"role": "assistant", "content": decision.say}
 
-    message: dict[str, Any] = {"role": "assistant", "content": "" if clarification else decision.say}
-    if calls:
-        call = calls[0]
-        message["tool_calls"] = [{
-            "type": "function",
-            "function": {"name": call["name"], "arguments": call["parameters"]},
-        }]
-    return message
+    payload = "; ".join(json.dumps(call, ensure_ascii=False, allow_nan=False) for call in calls)
+    prefix = "" if clarification else decision.say
+    return {
+        "role": "assistant",
+        "content": prefix + "<|python_tag|>" + payload + "<|eom_id|>",
+    }
